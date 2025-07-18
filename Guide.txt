@@ -1,0 +1,3 @@
+Guide on how to run bot: 
+First go to CMD Panel, than cd C:\Users\Micro\Desktop\LAPDDiscordBot
+Than run python bot.py
