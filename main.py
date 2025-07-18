@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 import os
 from dotenv import load_dotenv
+from keep_alive import keep_alive  # Import keep_alive
 
 # Load environment variables
 load_dotenv()
@@ -19,7 +20,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Replace this with your actual server ID
-GUILD_ID = 123456789012345678  # Example: 112233445566778899
+GUILD_ID = 1385546298744373320  # Example: 112233445566778899
 
 @bot.event
 async def on_ready():
@@ -56,5 +57,7 @@ async def infract(interaction: discord.Interaction, officer: str, reason: str, p
         except:
             await interaction.followup.send(f"Error: {e}", ephemeral=True)
 
-# Start the bot
+# Start the keep_alive webserver before running bot
+keep_alive()
+
 bot.run(TOKEN)
