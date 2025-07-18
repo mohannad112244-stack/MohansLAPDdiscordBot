@@ -20,30 +20,36 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Replace this with your actual server ID
-GUILD_ID = 1385546298744373320  # Example: 112233445566778899
+GUILD_ID = 1385546298744373320  # Your server ID here
 
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
     try:
         guild = discord.Object(id=GUILD_ID)
-        synced = await bot.tree.sync(guild=guild)  # Faster command sync
+        synced = await bot.tree.sync(guild=guild)  # Sync commands only for this guild for faster update
         print(f"🔄 Synced {len(synced)} commands to guild {GUILD_ID}")
     except Exception as e:
         print(f"❌ Sync error: {e}")
 
 @bot.tree.command(name="infract", description="Log an officer infraction")
 @app_commands.describe(
-    officer="Officer name",
+    officer="Select the officer (server member)",
     reason="Infraction reason",
     proof="Link or message proof (optional)",
     punishment="What did the officer violate"
 )
-async def infract(interaction: discord.Interaction, officer: str, reason: str, proof: str = "None", punishment: str = "None"):
+async def infract(
+    interaction: discord.Interaction,
+    officer: discord.Member,  # Member picker here
+    reason: str,
+    proof: str = "None",
+    punishment: str = "None"
+):
     print(f"📥 Slash command '/infract' invoked by {interaction.user}")
     try:
         embed = discord.Embed(title="🚨 Officer Infraction", color=discord.Color.red())
-        embed.add_field(name="Officer", value=officer, inline=False)
+        embed.add_field(name="Officer", value=officer.mention, inline=False)
         embed.add_field(name="Reason", value=reason, inline=False)
         embed.add_field(name="Proof", value=proof, inline=False)
         embed.add_field(name="Punishment", value=punishment, inline=False)
