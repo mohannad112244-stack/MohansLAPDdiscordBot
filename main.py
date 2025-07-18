@@ -2,53 +2,34 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import os
+from keep_alive import keep_alive  # ✅ keeps bot alive (for Railway or Replit)
 from dotenv import load_dotenv
-from keep_alive import keep_alive  # If you use this, else remove
 
 load_dotenv()
-TOKEN = os.getenv("BOT_TOKEN") or "YOUR_BOT_TOKEN"
+TOKEN = os.getenv("BOT_TOKEN")
 
 intents = discord.Intents.default()
-intents.guilds = True
-intents.members = True  # Required for member dropdown
+intents.message_content = True
+intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-GUILD_ID = 1385546298744373320  # Your server ID here
+GUILD_ID = discord.Object(id=1385546298744373320)  # ✅ Your Guild ID
 
 @bot.event
 async def on_ready():
+    await bot.tree.sync(guild=GUILD_ID)
     print(f"✅ Logged in as {bot.user}")
-    guild = discord.Object(id=GUILD_ID)
-    try:
-        synced = await bot.tree.sync(guild=guild)
-        print(f"🔄 Synced {len(synced)} commands to guild {GUILD_ID}")
-    except Exception as e:
-        print(f"❌ Sync error: {e}")
+    print("🔁 Synced slash commands to guild.")
 
-@bot.tree.command(name="infract", description="Log an officer infraction")
-@app_commands.describe(
-    officer="Select an officer from the dropdown",
-    reason="Infraction reason",
-    proof="Proof link or message (optional)",
-    punishment="Punishment (optional)"
-)
-async def infract(
-    interaction: discord.Interaction,
-    officer: discord.Member,
-    reason: str,
-    proof: str = "None",
-    punishment: str = "None"
-):
-    embed = discord.Embed(title="🚨 Officer Infraction", color=discord.Color.red())
-    embed.add_field(name="Officer", value=officer.mention, inline=False)
-    embed.add_field(name="Reason", value=reason, inline=False)
-    embed.add_field(name="Proof", value=proof, inline=False)
-    embed.add_field(name="Punishment", value=punishment, inline=False)
-    embed.set_footer(text=f"Issued by {interaction.user}")
+@bot.tree.command(name="infract", description="Log an infraction", guild=GUILD_ID)
+@app_commands.describe(officer="Select the officer")
+async def infract(interaction: discord.Interaction, officer: discord.Member):
+    await interaction.response.send_message(f"📋 Infraction logged for {officer.display_name}", ephemeral=True)
 
-    await interaction.response.send_message(embed=embed)
+# ✅ Keep bot alive (needed for Replit or Railway with UptimeRobot)
+keep_alive()
 
-keep_alive()  # If you don’t use keep_alive, remove this line
+# 🚀 Run the bot
 bot.run(TOKEN)
 
