@@ -20,8 +20,19 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 GUILD_ID = 1385546298744373320
 INFRACTIONS_CHANNEL_ID = 1395149042677186670
 LAPD_ROLE_ID = 1395320865469759548
-MASS_SHIFT_CHANNEL_ID = 1395372051988086894  # Fixed mass shift channel
+MASS_SHIFT_CHANNEL_ID = 1395372051988086894
+PROMO_DEMO_LOG_CHANNEL_ID = 1385555305475215440  # promotion/demotion log channel
 
+# Static rank choices for promote/demote commands
+RANK_CHOICES = [
+    app_commands.Choice(name="Officer", value="Officer"),
+    app_commands.Choice(name="Detective", value="Detective"),
+    app_commands.Choice(name="Sergeant", value="Sergeant"),
+    app_commands.Choice(name="Lieutenant", value="Lieutenant"),
+    app_commands.Choice(name="Captain", value="Captain"),
+    app_commands.Choice(name="Deputy Chief", value="Deputy Chief"),
+    app_commands.Choice(name="Chief", value="Chief"),
+]
 
 @bot.event
 async def on_ready():
@@ -33,9 +44,7 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Sync error: {e}")
 
-
-# ----------------------- LOG INFRACTION -----------------------
-
+# /log_infraction command
 @bot.tree.command(name="log_infraction", description="Log an officer infraction", guild=discord.Object(id=GUILD_ID))
 @app_commands.describe(
     officer="Select the officer",
@@ -51,6 +60,8 @@ async def on_ready():
     app_commands.Choice(name="None", value="None"),
 ])
 async def log_infraction(interaction: discord.Interaction, officer: discord.Member, reason: str, proof: str = "None", punishment: app_commands.Choice[str] = None):
+    print(f"📥 /log_infraction invoked by {interaction.user}")
+
     embed = discord.Embed(title="🚨 Officer Infraction", color=discord.Color.red(), timestamp=datetime.now(timezone.utc))
     embed.add_field(name="Officer", value=officer.mention, inline=False)
     embed.add_field(name="Reason", value=reason, inline=False)
@@ -62,12 +73,11 @@ async def log_infraction(interaction: discord.Interaction, officer: discord.Memb
     if infractions_channel:
         await infractions_channel.send(embed=embed)
         await interaction.response.send_message(f"Infraction logged for {officer.mention} in {infractions_channel.mention}.", ephemeral=True)
+        print("✅ Infraction logged and message sent.")
     else:
         await interaction.response.send_message("❌ Infractions channel not found.", ephemeral=True)
 
-
-# ----------------------- MASS SHIFT -----------------------
-
+# /mass_shift command
 @bot.tree.command(name="mass_shift", description="Announce a mass shift", guild=discord.Object(id=GUILD_ID))
 @app_commands.describe(
     reason="Reason for the mass shift",
@@ -79,6 +89,8 @@ async def log_infraction(interaction: discord.Interaction, officer: discord.Memb
     app_commands.Choice(name="No", value="No"),
 ])
 async def mass_shift(interaction: discord.Interaction, reason: str, promotional: app_commands.Choice[str], cohost: str):
+    print(f"📥 /mass_shift invoked by {interaction.user}")
+
     guild = bot.get_guild(GUILD_ID)
     lapd_role = guild.get_role(LAPD_ROLE_ID) if guild else None
     mass_shift_channel = bot.get_channel(MASS_SHIFT_CHANNEL_ID)
@@ -86,6 +98,7 @@ async def mass_shift(interaction: discord.Interaction, reason: str, promotional:
     if not lapd_role:
         await interaction.response.send_message("❌ LAPD role not found.", ephemeral=True)
         return
+
     if not mass_shift_channel:
         await interaction.response.send_message("❌ Mass shift channel not found.", ephemeral=True)
         return
@@ -93,7 +106,7 @@ async def mass_shift(interaction: discord.Interaction, reason: str, promotional:
     cohost_member = None
     if cohost.lower() != "n/a":
         cohost_member = discord.utils.find(lambda m: m.name.lower() == cohost.lower() or str(m.id) == cohost, guild.members)
-
+    
     embed = discord.Embed(title="📢 Mass Shift Announcement", color=discord.Color.blue(), timestamp=datetime.now(timezone.utc))
     embed.add_field(name="LAPD Role", value=lapd_role.mention, inline=False)
     embed.add_field(name="Reason", value=reason, inline=False)
@@ -103,121 +116,83 @@ async def mass_shift(interaction: discord.Interaction, reason: str, promotional:
 
     await mass_shift_channel.send(embed=embed)
     await interaction.response.send_message(f"Mass shift announcement sent in {mass_shift_channel.mention}.", ephemeral=True)
+    print("✅ Mass shift announcement sent.")
 
-
-# ----------------------- PROMOTE & DEMOTE COMMANDS -----------------------
-
-# UI dropdown for server roles
-class RoleDropdown(discord.ui.Select):
-    def __init__(self, roles, placeholder: str):
-        options = [discord.SelectOption(label=role.name, value=str(role.id)) for role in roles]
-        super().__init__(placeholder=placeholder, options=options, min_values=1, max_values=1)
-        self.selected_role = None
-
-    async def callback(self, interaction: discord.Interaction):
-        self.selected_role = interaction.guild.get_role(int(self.values[0]))
-        await interaction.response.defer()  # Just defer; main logic will handle later
-
-
-class RoleSelectView(discord.ui.View):
-    def __init__(self, roles, placeholder):
-        super().__init__()
-        self.role_dropdown = RoleDropdown(roles, placeholder)
-        self.add_item(self.role_dropdown)
-
-
-async def role_autocomplete(interaction: discord.Interaction, current: str):
-    # Return list of role names matching current input (max 25)
-    guild = bot.get_guild(GUILD_ID)
-    roles = [r for r in guild.roles if current.lower() in r.name.lower()]
-    return [
-        app_commands.Choice(name=role.name, value=role.id)
-        for role in roles[:25]
-    ]
-
-
-async def member_autocomplete(interaction: discord.Interaction, current: str):
-    guild = bot.get_guild(GUILD_ID)
-    members = [m for m in guild.members if current.lower() in m.display_name.lower()]
-    return [
-        app_commands.Choice(name=m.display_name, value=m.id)
-        for m in members[:25]
-    ]
-
-
+# /promote command
 @bot.tree.command(name="promote", description="Promote an officer", guild=discord.Object(id=GUILD_ID))
 @app_commands.describe(
-    officer="Select officer to promote",
-    old_rank="Officer's current rank",
-    new_rank="Officer's new rank",
-    notes="Additional notes"
+    officer="Select the officer to promote",
+    old_rank="Current rank of the officer",
+    new_rank="New rank to assign",
+    notes="Additional notes (optional)"
 )
-@app_commands.autocomplete(
-    officer=member_autocomplete,
+@app_commands.choices(
+    old_rank=RANK_CHOICES,
+    new_rank=RANK_CHOICES
 )
-async def promote(interaction: discord.Interaction, officer: discord.Member, old_rank: str, new_rank: str, notes: str = "None"):
+async def promote(interaction: discord.Interaction, officer: discord.Member, old_rank: app_commands.Choice[str], new_rank: app_commands.Choice[str], notes: str = ""):
+    print(f"📥 /promote invoked by {interaction.user}")
+
+    # Remove old rank role if present, add new rank role
     guild = bot.get_guild(GUILD_ID)
-    infractions_channel = bot.get_channel(INFRACTIONS_CHANNEL_ID)
-    
-    # Find roles by exact name, fallback to None
-    old_role = discord.utils.get(guild.roles, name=old_rank)
-    new_role = discord.utils.get(guild.roles, name=new_rank)
+    old_role = discord.utils.get(guild.roles, name=old_rank.value)
+    new_role = discord.utils.get(guild.roles, name=new_rank.value)
 
-    # Remove old role if exists, add new role if exists
-    if old_role and old_role in officer.roles:
-        await officer.remove_roles(old_role)
+    if old_role in officer.roles:
+        await officer.remove_roles(old_role, reason=f"Promoted by {interaction.user}")
     if new_role and new_role not in officer.roles:
-        await officer.add_roles(new_role)
+        await officer.add_roles(new_role, reason=f"Promoted by {interaction.user}")
 
+    # Build embed log
     embed = discord.Embed(title="📈 Promotion Logged", color=discord.Color.green(), timestamp=datetime.now(timezone.utc))
     embed.add_field(name="Officer", value=officer.mention, inline=False)
-    embed.add_field(name="Old Rank", value=old_rank, inline=True)
-    embed.add_field(name="New Rank", value=new_rank, inline=True)
-    embed.add_field(name="Notes", value=notes, inline=False)
+    embed.add_field(name="Old Rank", value=old_rank.value, inline=True)
+    embed.add_field(name="New Rank", value=new_rank.value, inline=True)
+    embed.add_field(name="Notes", value=notes if notes else "None", inline=False)
     embed.set_footer(text=f"Issued by {interaction.user.display_name}", icon_url=interaction.user.display_avatar.url)
 
-    if infractions_channel:
-        await infractions_channel.send(embed=embed)
-        await interaction.response.send_message(f"Promotion logged and roles updated for {officer.mention}.", ephemeral=True)
-    else:
-        await interaction.response.send_message("❌ Infractions channel not found.", ephemeral=True)
+    log_channel = bot.get_channel(PROMO_DEMO_LOG_CHANNEL_ID)
+    if log_channel:
+        await log_channel.send(embed=embed)
+    await interaction.response.send_message(f"{officer.mention} promoted from {old_rank.value} to {new_rank.value}.", ephemeral=True)
+    print("✅ Promotion logged.")
 
-
+# /demote command
 @bot.tree.command(name="demote", description="Demote an officer", guild=discord.Object(id=GUILD_ID))
 @app_commands.describe(
-    officer="Select officer to demote",
-    old_rank="Officer's current rank",
-    new_rank="Officer's new rank",
-    notes="Additional notes"
+    officer="Select the officer to demote",
+    old_rank="Current rank of the officer",
+    new_rank="New rank to assign",
+    notes="Additional notes (optional)"
 )
-@app_commands.autocomplete(
-    officer=member_autocomplete,
+@app_commands.choices(
+    old_rank=RANK_CHOICES,
+    new_rank=RANK_CHOICES
 )
-async def demote(interaction: discord.Interaction, officer: discord.Member, old_rank: str, new_rank: str, notes: str = "None"):
-    guild = bot.get_guild(GUILD_ID)
-    infractions_channel = bot.get_channel(INFRACTIONS_CHANNEL_ID)
-    
-    old_role = discord.utils.get(guild.roles, name=old_rank)
-    new_role = discord.utils.get(guild.roles, name=new_rank)
+async def demote(interaction: discord.Interaction, officer: discord.Member, old_rank: app_commands.Choice[str], new_rank: app_commands.Choice[str], notes: str = ""):
+    print(f"📥 /demote invoked by {interaction.user}")
 
-    if old_role and old_role in officer.roles:
-        await officer.remove_roles(old_role)
+    guild = bot.get_guild(GUILD_ID)
+    old_role = discord.utils.get(guild.roles, name=old_rank.value)
+    new_role = discord.utils.get(guild.roles, name=new_rank.value)
+
+    if old_role in officer.roles:
+        await officer.remove_roles(old_role, reason=f"Demoted by {interaction.user}")
     if new_role and new_role not in officer.roles:
-        await officer.add_roles(new_role)
+        await officer.add_roles(new_role, reason=f"Demoted by {interaction.user}")
 
     embed = discord.Embed(title="📉 Demotion Logged", color=discord.Color.orange(), timestamp=datetime.now(timezone.utc))
     embed.add_field(name="Officer", value=officer.mention, inline=False)
-    embed.add_field(name="Old Rank", value=old_rank, inline=True)
-    embed.add_field(name="New Rank", value=new_rank, inline=True)
-    embed.add_field(name="Notes", value=notes, inline=False)
+    embed.add_field(name="Old Rank", value=old_rank.value, inline=True)
+    embed.add_field(name="New Rank", value=new_rank.value, inline=True)
+    embed.add_field(name="Notes", value=notes if notes else "None", inline=False)
     embed.set_footer(text=f"Issued by {interaction.user.display_name}", icon_url=interaction.user.display_avatar.url)
 
-    if infractions_channel:
-        await infractions_channel.send(embed=embed)
-        await interaction.response.send_message(f"Demotion logged and roles updated for {officer.mention}.", ephemeral=True)
-    else:
-        await interaction.response.send_message("❌ Infractions channel not found.", ephemeral=True)
-
+    log_channel = bot.get_channel(PROMO_DEMO_LOG_CHANNEL_ID)
+    if log_channel:
+        await log_channel.send(embed=embed)
+    await interaction.response.send_message(f"{officer.mention} demoted from {old_rank.value} to {new_rank.value}.", ephemeral=True)
+    print("✅ Demotion logged.")
 
 keep_alive()
 bot.run(TOKEN)
