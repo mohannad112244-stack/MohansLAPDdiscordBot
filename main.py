@@ -21,18 +21,6 @@ GUILD_ID = 1385546298744373320
 INFRACTIONS_CHANNEL_ID = 1395149042677186670
 LAPD_ROLE_ID = 1395320865469759548
 MASS_SHIFT_CHANNEL_ID = 1395372051988086894
-PROMO_DEMO_LOG_CHANNEL_ID = 1385555305475215440  # promotion/demotion log channel
-
-# Static rank choices for promote/demote commands
-RANK_CHOICES = [
-    app_commands.Choice(name="Officer", value="Officer"),
-    app_commands.Choice(name="Detective", value="Detective"),
-    app_commands.Choice(name="Sergeant", value="Sergeant"),
-    app_commands.Choice(name="Lieutenant", value="Lieutenant"),
-    app_commands.Choice(name="Captain", value="Captain"),
-    app_commands.Choice(name="Deputy Chief", value="Deputy Chief"),
-    app_commands.Choice(name="Chief", value="Chief"),
-]
 
 @bot.event
 async def on_ready():
@@ -44,7 +32,26 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Sync error: {e}")
 
-# /log_infraction command
+# Autocomplete for server roles (returns role IDs as strings)
+async def role_autocomplete(interaction: discord.Interaction, current: str):
+    roles = []
+    if interaction.guild:
+        roles = [role for role in interaction.guild.roles if current.lower() in role.name.lower()]
+    return [
+        app_commands.Choice(name=role.name, value=str(role.id))
+        for role in roles[:25]
+    ]
+
+# Autocomplete for member dropdown
+async def member_autocomplete(interaction: discord.Interaction, current: str):
+    members = []
+    if interaction.guild:
+        members = [member for member in interaction.guild.members if current.lower() in member.display_name.lower()]
+    return [
+        app_commands.Choice(name=member.display_name, value=str(member.id))
+        for member in members[:25]
+    ]
+
 @bot.tree.command(name="log_infraction", description="Log an officer infraction", guild=discord.Object(id=GUILD_ID))
 @app_commands.describe(
     officer="Select the officer",
@@ -77,7 +84,6 @@ async def log_infraction(interaction: discord.Interaction, officer: discord.Memb
     else:
         await interaction.response.send_message("❌ Infractions channel not found.", ephemeral=True)
 
-# /mass_shift command
 @bot.tree.command(name="mass_shift", description="Announce a mass shift", guild=discord.Object(id=GUILD_ID))
 @app_commands.describe(
     reason="Reason for the mass shift",
@@ -118,81 +124,97 @@ async def mass_shift(interaction: discord.Interaction, reason: str, promotional:
     await interaction.response.send_message(f"Mass shift announcement sent in {mass_shift_channel.mention}.", ephemeral=True)
     print("✅ Mass shift announcement sent.")
 
-# /promote command
 @bot.tree.command(name="promote", description="Promote an officer", guild=discord.Object(id=GUILD_ID))
 @app_commands.describe(
-    officer="Select the officer to promote",
-    old_rank="Current rank of the officer",
-    new_rank="New rank to assign",
-    notes="Additional notes (optional)"
+    officer="Select the officer",
+    old_rank="Select the officer's current rank",
+    new_rank="Select the officer's new rank",
+    notes="Notes about the promotion"
 )
-@app_commands.choices(
-    old_rank=RANK_CHOICES,
-    new_rank=RANK_CHOICES
-)
-async def promote(interaction: discord.Interaction, officer: discord.Member, old_rank: app_commands.Choice[str], new_rank: app_commands.Choice[str], notes: str = ""):
+@app_commands.autocomplete(old_rank=role_autocomplete)
+@app_commands.autocomplete(new_rank=role_autocomplete)
+@app_commands.autocomplete(officer=member_autocomplete)
+async def promote(interaction: discord.Interaction, officer: str, old_rank: str, new_rank: str, notes: str = ""):
     print(f"📥 /promote invoked by {interaction.user}")
 
-    # Remove old rank role if present, add new rank role
-    guild = bot.get_guild(GUILD_ID)
-    old_role = discord.utils.get(guild.roles, name=old_rank.value)
-    new_role = discord.utils.get(guild.roles, name=new_rank.value)
+    guild = interaction.guild
+    if not guild:
+        await interaction.response.send_message("❌ Guild not found.", ephemeral=True)
+        return
 
-    if old_role in officer.roles:
-        await officer.remove_roles(old_role, reason=f"Promoted by {interaction.user}")
-    if new_role and new_role not in officer.roles:
-        await officer.add_roles(new_role, reason=f"Promoted by {interaction.user}")
+    officer_member = guild.get_member(int(officer))
+    old_role = guild.get_role(int(old_rank))
+    new_role = guild.get_role(int(new_rank))
+    if not officer_member or not old_role or not new_role:
+        await interaction.response.send_message("❌ Invalid officer or roles.", ephemeral=True)
+        return
 
-    # Build embed log
+    # Remove old role and add new role
+    try:
+        await officer_member.remove_roles(old_role)
+        await officer_member.add_roles(new_role)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error updating roles: {e}", ephemeral=True)
+        return
+
     embed = discord.Embed(title="📈 Promotion Logged", color=discord.Color.green(), timestamp=datetime.now(timezone.utc))
-    embed.add_field(name="Officer", value=officer.mention, inline=False)
-    embed.add_field(name="Old Rank", value=old_rank.value, inline=True)
-    embed.add_field(name="New Rank", value=new_rank.value, inline=True)
+    embed.add_field(name="Officer", value=officer_member.mention, inline=False)
+    embed.add_field(name="Old Rank", value=old_role.name, inline=True)
+    embed.add_field(name="New Rank", value=new_role.name, inline=True)
     embed.add_field(name="Notes", value=notes if notes else "None", inline=False)
     embed.set_footer(text=f"Issued by {interaction.user.display_name}", icon_url=interaction.user.display_avatar.url)
 
-    log_channel = bot.get_channel(PROMO_DEMO_LOG_CHANNEL_ID)
+    log_channel = bot.get_channel(INFRACTIONS_CHANNEL_ID)
     if log_channel:
         await log_channel.send(embed=embed)
-    await interaction.response.send_message(f"{officer.mention} promoted from {old_rank.value} to {new_rank.value}.", ephemeral=True)
-    print("✅ Promotion logged.")
 
-# /demote command
+    await interaction.response.send_message(f"{officer_member.mention} has been promoted from {old_role.name} to {new_role.name}.", ephemeral=True)
+
 @bot.tree.command(name="demote", description="Demote an officer", guild=discord.Object(id=GUILD_ID))
 @app_commands.describe(
-    officer="Select the officer to demote",
-    old_rank="Current rank of the officer",
-    new_rank="New rank to assign",
-    notes="Additional notes (optional)"
+    officer="Select the officer",
+    old_rank="Select the officer's current rank",
+    new_rank="Select the officer's new rank",
+    notes="Notes about the demotion"
 )
-@app_commands.choices(
-    old_rank=RANK_CHOICES,
-    new_rank=RANK_CHOICES
-)
-async def demote(interaction: discord.Interaction, officer: discord.Member, old_rank: app_commands.Choice[str], new_rank: app_commands.Choice[str], notes: str = ""):
+@app_commands.autocomplete(old_rank=role_autocomplete)
+@app_commands.autocomplete(new_rank=role_autocomplete)
+@app_commands.autocomplete(officer=member_autocomplete)
+async def demote(interaction: discord.Interaction, officer: str, old_rank: str, new_rank: str, notes: str = ""):
     print(f"📥 /demote invoked by {interaction.user}")
 
-    guild = bot.get_guild(GUILD_ID)
-    old_role = discord.utils.get(guild.roles, name=old_rank.value)
-    new_role = discord.utils.get(guild.roles, name=new_rank.value)
+    guild = interaction.guild
+    if not guild:
+        await interaction.response.send_message("❌ Guild not found.", ephemeral=True)
+        return
 
-    if old_role in officer.roles:
-        await officer.remove_roles(old_role, reason=f"Demoted by {interaction.user}")
-    if new_role and new_role not in officer.roles:
-        await officer.add_roles(new_role, reason=f"Demoted by {interaction.user}")
+    officer_member = guild.get_member(int(officer))
+    old_role = guild.get_role(int(old_rank))
+    new_role = guild.get_role(int(new_rank))
+    if not officer_member or not old_role or not new_role:
+        await interaction.response.send_message("❌ Invalid officer or roles.", ephemeral=True)
+        return
+
+    # Remove old role and add new role
+    try:
+        await officer_member.remove_roles(old_role)
+        await officer_member.add_roles(new_role)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error updating roles: {e}", ephemeral=True)
+        return
 
     embed = discord.Embed(title="📉 Demotion Logged", color=discord.Color.orange(), timestamp=datetime.now(timezone.utc))
-    embed.add_field(name="Officer", value=officer.mention, inline=False)
-    embed.add_field(name="Old Rank", value=old_rank.value, inline=True)
-    embed.add_field(name="New Rank", value=new_rank.value, inline=True)
+    embed.add_field(name="Officer", value=officer_member.mention, inline=False)
+    embed.add_field(name="Old Rank", value=old_role.name, inline=True)
+    embed.add_field(name="New Rank", value=new_role.name, inline=True)
     embed.add_field(name="Notes", value=notes if notes else "None", inline=False)
     embed.set_footer(text=f"Issued by {interaction.user.display_name}", icon_url=interaction.user.display_avatar.url)
 
-    log_channel = bot.get_channel(PROMO_DEMO_LOG_CHANNEL_ID)
+    log_channel = bot.get_channel(INFRACTIONS_CHANNEL_ID)
     if log_channel:
         await log_channel.send(embed=embed)
-    await interaction.response.send_message(f"{officer.mention} demoted from {old_rank.value} to {new_rank.value}.", ephemeral=True)
-    print("✅ Demotion logged.")
+
+    await interaction.response.send_message(f"{officer_member.mention} has been demoted from {old_role.name} to {new_role.name}.", ephemeral=True)
 
 keep_alive()
 bot.run(TOKEN)
