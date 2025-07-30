@@ -2,49 +2,38 @@ import discord
 from discord.ext import commands
 import os
 import openai
-from dotenv import load_dotenv
 
-load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
-class LAPDAI(commands.Cog):
+class LapdAI(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        openai.api_key = os.getenv("OPENAI_API_KEY")
 
     @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
+    async def on_message(self, message):
         if message.author.bot:
             return
 
-        bot_user = self.bot.user
-        bot_mentioned = bot_user in message.mentions
-        replied_to_bot = False
+        # Check if bot was mentioned or replied to
+        if self.bot.user in message.mentions or (message.reference and message.reference.resolved.author == self.bot.user):
+            prompt = message.content.replace(f"<@{self.bot.user.id}>", "").strip()
 
-        if message.reference:
-            try:
-                replied_msg = await message.channel.fetch_message(message.reference.message_id)
-                if replied_msg.author == bot_user:
-                    replied_to_bot = True
-            except Exception:
-                pass
-
-        if bot_mentioned or replied_to_bot:
-            content = message.content.replace(f"<@{bot_user.id}>", "").strip()
-            if not content:
-                content = "Hello!"
+            if not prompt:
+                await message.channel.send("Yes, Officer? How can I assist?")
+                return
 
             try:
-                response = openai.ChatCompletion.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": content}],
+                response = openai.Completion.create(
+                    engine="text-davinci-003",
+                    prompt=prompt,
                     max_tokens=150,
                     temperature=0.7,
+                    n=1,
+                    stop=None,
                 )
-                reply_text = response.choices[0].message.content.strip()
-            except Exception:
-                reply_text = "Sorry, I couldn't process that right now."
-
-            await message.channel.send(reply_text)
+                answer = response.choices[0].text.strip()
+                await message.channel.send(answer)
+            except Exception as e:
+                await message.channel.send("Sorry, I can't process that right now.")
 
 def setup(bot):
-    bot.add_cog(LAPDAI(bot))
+    bot.add_cog(LapdAI(bot))
