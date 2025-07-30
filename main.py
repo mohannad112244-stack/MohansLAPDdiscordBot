@@ -1,15 +1,16 @@
 import discord
+from discord import app_commands
 from discord.ext import commands
 import os
 from dotenv import load_dotenv
 from keep_alive import keep_alive
 from datetime import datetime, timezone
 
-load_dotenv()  # Load local .env for dev; Railway overrides env vars automatically
+load_dotenv()
 
 TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
-    print("❌ BOT_TOKEN missing! Set it in your environment variables.")
+    print("❌ BOT_TOKEN missing!")
     exit(1)
 
 intents = discord.Intents.default()
@@ -38,12 +39,9 @@ async def on_ready():
 
 @bot.event
 async def setup_hook():
-    # Load AI cog
     await bot.load_extension("lapd_ai")
 
-# Your existing slash commands (log_infraction, mass_shift, promote, demote)
-# Paste your existing commands here (from your original main.py) exactly as you had them,
-# or I can help re-add them if you want.
+# Paste your full existing slash commands here, unchanged
 
 keep_alive()
 bot.run(TOKEN)

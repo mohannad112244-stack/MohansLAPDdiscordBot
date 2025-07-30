@@ -13,7 +13,6 @@ class LapdAI(commands.Cog):
         if message.author.bot:
             return
 
-        # Check if bot was mentioned or replied to
         if self.bot.user in message.mentions or (message.reference and message.reference.resolved.author == self.bot.user):
             prompt = message.content.replace(f"<@{self.bot.user.id}>", "").strip()
 
@@ -27,12 +26,10 @@ class LapdAI(commands.Cog):
                     prompt=prompt,
                     max_tokens=150,
                     temperature=0.7,
-                    n=1,
-                    stop=None,
                 )
                 answer = response.choices[0].text.strip()
                 await message.channel.send(answer)
-            except Exception as e:
+            except Exception:
                 await message.channel.send("Sorry, I can't process that right now.")
 
 def setup(bot):
