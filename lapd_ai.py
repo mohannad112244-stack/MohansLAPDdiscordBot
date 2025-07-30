@@ -24,13 +24,13 @@ class LapdAI(commands.Cog):
                 return
 
             try:
-                response = openai.Completion.create(
-                    engine="text-davinci-003",
-                    prompt=prompt,
+                response = openai.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": prompt}],
                     max_tokens=150,
                     temperature=0.7,
                 )
-                answer = response.choices[0].text.strip()
+                answer = response.choices[0].message.content.strip()
                 await message.channel.send(answer)
             except Exception as e:
                 print(f"OpenAI API error: {e}")
