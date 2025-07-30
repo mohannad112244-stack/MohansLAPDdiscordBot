@@ -13,13 +13,12 @@ class LapdAI(commands.Cog):
         if message.author.bot:
             return
 
-        # Trigger only if bot is mentioned or replied to
         if self.bot.user in message.mentions or \
            (message.reference and message.reference.resolved and message.reference.resolved.author == self.bot.user):
 
             content_lower = message.content.lower()
 
-            # Basic keyword-responses dictionary
+            # Lots of keyword triggers and their replies
             responses = {
                 "besties forever": "Absolutely, partners in crime! 👮‍♂️❤️",
                 "test": "Testing, 1, 2, 3... Bot is online and ready!",
@@ -29,7 +28,18 @@ class LapdAI(commands.Cog):
                 "good morning": "Good morning! Hope you have a safe shift.",
                 "good night": "Good night! Stay safe out there.",
                 "thank you": "Anytime! Glad to help.",
+                "thanks": "You're welcome, Officer!",
                 "bye": "See you later, Officer! Stay safe.",
+                "what's up": "Just keeping the city safe. What about you?",
+                "help": "I'm here! What do you need assistance with?",
+                "who are you": "I'm your trusty LAPD bot, here to assist with anything you need!",
+                "joke": "Why did the police officer go to the bakery? Because he wanted a *doughnut* break! 🍩",
+                "weather": "I don’t have weather updates yet, but stay prepared for anything!",
+                "good job": "Thank you! You're doing great too.",
+                "lol": "😄 Glad to see you’re enjoying yourself!",
+                "congrats": "Congratulations! Keep up the great work.",
+                "sorry": "No worries, Officer. We all make mistakes.",
+                "ok": "Roger that!",
             }
 
             for trigger, reply in responses.items():
@@ -37,7 +47,7 @@ class LapdAI(commands.Cog):
                     await message.channel.send(reply)
                     return
 
-            # If no keyword matched, fallback to OpenAI response
+            # No keyword matched - fallback to OpenAI
             prompt = message.content.replace(f"<@{self.bot.user.id}>", "").strip()
             if not prompt:
                 await message.channel.send("Yes, Officer? How can I assist?")
