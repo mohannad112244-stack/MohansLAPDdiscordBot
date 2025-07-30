@@ -13,7 +13,10 @@ class LapdAI(commands.Cog):
         if message.author.bot:
             return
 
-        if self.bot.user in message.mentions or (message.reference and message.reference.resolved and message.reference.resolved.author == self.bot.user):
+        # Check if bot was mentioned or replied to
+        if self.bot.user in message.mentions or \
+           (message.reference and message.reference.resolved and message.reference.resolved.author == self.bot.user):
+
             prompt = message.content.replace(f"<@{self.bot.user.id}>", "").strip()
 
             if not prompt:
@@ -29,7 +32,8 @@ class LapdAI(commands.Cog):
                 )
                 answer = response.choices[0].text.strip()
                 await message.channel.send(answer)
-            except Exception:
+            except Exception as e:
+                print(f"OpenAI API error: {e}")
                 await message.channel.send("Sorry, I can't process that right now.")
 
 async def setup(bot):
