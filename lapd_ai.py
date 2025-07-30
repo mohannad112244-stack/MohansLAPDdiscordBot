@@ -13,7 +13,7 @@ class LapdAI(commands.Cog):
         if message.author.bot:
             return
 
-        if self.bot.user in message.mentions or (message.reference and message.reference.resolved.author == self.bot.user):
+        if self.bot.user in message.mentions or (message.reference and message.reference.resolved and message.reference.resolved.author == self.bot.user):
             prompt = message.content.replace(f"<@{self.bot.user.id}>", "").strip()
 
             if not prompt:
@@ -32,5 +32,5 @@ class LapdAI(commands.Cog):
             except Exception:
                 await message.channel.send("Sorry, I can't process that right now.")
 
-def setup(bot):
-    bot.add_cog(LapdAI(bot))
+async def setup(bot):
+    await bot.add_cog(LapdAI(bot))

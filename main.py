@@ -41,7 +41,29 @@ async def on_ready():
 async def setup_hook():
     await bot.load_extension("lapd_ai")
 
-# Paste your full existing slash commands here, unchanged
+# Your original commands below (log_infraction, mass_shift, promote, demote) go here, exactly as before
+# For example:
+
+@bot.tree.command(name="log_infraction", description="Log an officer infraction", guild=discord.Object(id=GUILD_ID))
+@app_commands.describe(
+    officer="Select the officer",
+    reason="Reason for the infraction",
+    proof="Proof link or message (optional)",
+    punishment="Punishment for the officer"
+)
+@app_commands.choices(punishment=[
+    app_commands.Choice(name="Verbal Warning", value="Verbal Warning"),
+    app_commands.Choice(name="Written Warning", value="Written Warning"),
+    app_commands.Choice(name="Suspension", value="Suspension"),
+    app_commands.Choice(name="Termination", value="Termination"),
+    app_commands.Choice(name="None", value="None"),
+])
+async def log_infraction(interaction: discord.Interaction, officer: discord.Member, reason: str, proof: str = "None", punishment: app_commands.Choice[str] = None):
+    # Your full existing logic here
+
+    pass  # replace with your original code
+
+# Repeat for mass_shift, promote, demote commands...
 
 keep_alive()
 bot.run(TOKEN)
